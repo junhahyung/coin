@@ -6,55 +6,34 @@ from torch.utils.data import DataLoader
 import yaml
 from attrdict import AttrDict
 from trainer_classifier import Trainer
-from dataset import TradingDataset, TradingDatasetAP
+from dataset import get_dataset, CoinDataset
 from models.get_model import get_model
 
 
 # main loop
-def run(opt):
-    with open('./config_classifier_ampm.yaml', 'r') as fp:
-        args = AttrDict(yaml.load(fp, Loader=yaml.FullLoader))
+def run(conf):
+    args = conf
 
-    # prepare arguments
-    args.name = opt.name
-    args.nhist = opt.nhist
-    args.ntarget = list(opt.ntarget)
-    args.use_ampm = bool(args.use_ampm)
-    for i in args.ntarget:
-        assert isinstance(i, int)
-
-    print('==== N target====')
-    print(args.ntarget)
-    # arguments that we want to control during training
-    args['training']['num_attention_heads'] = opt.num_attention_heads
-    args['training']['hidden_size'] = opt.hidden_size
-    args['training']['bert_layers'] = opt.bert_layers
+    # prepare argument
 
     device = 'cuda:0'
     models = []
     optimizers = []
 
+    train_loader, valid_loader = get_dataset(args)
+    for data in train_loader:
+        args.input_dim = data[0].shape[-1]
+
     # number of ensemble
-    for i in range(args.training.n_ensemble):
+    for i in range(args.n_ensemble):
         model, optimizer, bert_config = get_model(args)
         models.append(model)
         optimizers.append(optimizer)
 
     print(bert_config)
 
+
     # prepare dataset
-    if args.use_ampm:
-        print(args.use_ampm)
-        print('~~~~')
-        dataset_train = TradingDatasetAP(args, mode='train')
-        dataset_test = TradingDatasetAP(args, mode='test')
-    else:
-        dataset_train = TradingDataset(args, mode='train')
-        dataset_test = TradingDataset(args, mode='test')
-
-    dataloader_train = DataLoader(dataset_train, batch_size=args.training.batch_size, shuffle=True, num_workers=16)
-    dataloader_test = DataLoader(dataset_test, batch_size=args.training.batch_size, shuffle=False, num_workers=16)
-
     # prepare loss function
     loss_fn = nn.CrossEntropyLoss()
 
@@ -62,8 +41,8 @@ def run(opt):
     trainer = Trainer(args,
                     models,
                     optimizers,
-                    dataloader_train,
-                    dataloader_test,
+                    train_loader,
+                    valid_loader,
                     loss_fn,
                     device)
 
@@ -74,20 +53,39 @@ def run(opt):
     print(f'best confusion: {trainer.best_confusion}')
     
 
+def add_global_args():
+    args = argparse.ArgumentParser()
+    args.add_argument("--pair", default="BTC", type=str)
+    args.add_argument("--intv", default="1h", type=str)
+    args.add_argument("--nhist", default=100, type=int)
+    args.add_argument("--ntarget", default=4, type=int)
+    args.add_argument("--ratio", default=0.9, type=float)
+    args.add_argument("--bs", default=2048, type=int)
 
-# parse input arguments
-def parse():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--name", default='default_run')
-    parser.add_argument("--nhist", default=10, type=int)
-    parser.add_argument("--ntarget", default=[1], type=int, nargs='+')
-    parser.add_argument("--bert_layers", default=2, type=int)
-    parser.add_argument("--num_attention_heads", default=6, type=int)
-    parser.add_argument("--hidden_size", default=192, type=int)
-    opt = parser.parse_args()
+    # model config
+    args.add_argument("--n_ensemble", default=5, type=int)
+    args.add_argument("--nway", default=2, type=int)
+    args.add_argument("--n_epochs", default=500, type=int)
+    args.add_argument("--save_freq", default=1000, type=int)
+    args.add_argument("--val_freq", default=50, type=int)
+    args.add_argument("--lr", default=0.0001, type=float)
+    args.add_argument("--dropout", default=0.1, type=float)
+    args.add_argument("--attention_dropout", default=0.1, type=float)
+    args.add_argument("--num_attention_heads", default=6, type=int)
+    args.add_argument("--hidden_size", default=192, type=int)
+    args.add_argument("--intermediate_size", default=768, type=int)
+    args.add_argument("--bert_layers", default=2, type=int)
 
-    return opt
+    args.add_argument("--name", default='default', type=str)
+    args.add_argument("--output_dir", default='/home/nas1_temp/junhahyung/trading/output/', type=str)
+    
+    # For local run
+    args.add_argument('-f', type=str, default="")
+    
+    conf = args.parse_args()
 
-# run training
-opt = parse()
-run(opt)
+    return conf
+
+
+conf = add_global_args()
+run(conf)

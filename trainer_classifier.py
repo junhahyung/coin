@@ -21,8 +21,8 @@ class Trainer():
         self.dataloader_test = dataloader_test
         self.device = device
         self.loss_fn = loss_fn.to(device)
-        self.n_epochs = args.training.n_epochs
-        self.nway = args.training.nway
+        self.n_epochs = args.n_epochs
+        self.nway = args.nway
         if self.nway == 3:
             self.class_names = ["0", "pos", "neg"] 
         elif self.nway == 2:
@@ -30,32 +30,30 @@ class Trainer():
 
 
         self.best_acc = 0
+        self.best_thres_acc = 0
+        '''
         self.best_thres_07_acc = 0
         self.best_thres_08_acc = 0
         self.best_thres_09_acc = 0
+        '''
         self.softmax = nn.Softmax(dim=1)
 
-        self.output_dir = os.path.join(args.training.output_dir, args.name)
+        self.output_dir = os.path.join(args.output_dir, args.name)
         os.makedirs(self.output_dir, exist_ok=True)
         print(f"output dir: {self.output_dir}")
 
 
     # training function
     def train(self):
-        wandb.init(entity='junha', project="trading", name=self.args.name)
+        wandb.init(entity='junha', project="coin", name=self.args.name)
         global_step = 0
-        if self.args.use_ampm:
-            print('Use ampm in training')
 
         for epoch in range(self.n_epochs):
             print(f'start epoch [{epoch}]')
             for step, batch in enumerate(tqdm.tqdm(self.dataloader_train)):
                 global_step += step
                 # train step
-                if self.args.use_ampm:
-                    self.train_step_ampm(batch, global_step, epoch)
-                else:
-                    self.train_step(batch, global_step, epoch)
+                self.train_step(batch, global_step, epoch)
 
         # write summary file
         fn = os.path.join(self.output_dir, 'summary.txt')
@@ -63,9 +61,10 @@ class Trainer():
             fp.write(str(self.args))
             fp.write('\n==================\n')
             fp.write(f'best val acc: {self.best_acc}\n')
-            fp.write(f'best thres 0.7 val acc: {self.best_thres_07_acc}\n')
-            fp.write(f'best thres 0.8 val acc: {self.best_thres_08_acc}\n')
-            fp.write(f'best thres 0.9 val acc: {self.best_thres_09_acc}\n')
+            fp.write(f'best thres val acc: {self.best_thres_acc}\n')
+            #fp.write(f'best thres 0.7 val acc: {self.best_thres_07_acc}\n')
+            #fp.write(f'best thres 0.8 val acc: {self.best_thres_08_acc}\n')
+            #fp.write(f'best thres 0.9 val acc: {self.best_thres_09_acc}\n')
             fp.write(f'best confusion: {self.best_confusion}')
 
 
@@ -111,7 +110,7 @@ class Trainer():
 
 
         # validation step
-        if step % self.args.training.val_freq == 0:
+        if step % self.args.val_freq == 0:
             print('[start validation]')
             val_loss_sum = 0
             val_acc_sum = 0
@@ -183,7 +182,7 @@ class Trainer():
             acc = self.calc_acc(max_ind, y.view(-1))
 
             pred = self.softmax(pred)
-            trunc_pred = torch.where(pred > 0.9, pred, torch.zeros_like(pred).to(self.device))
+            trunc_pred = torch.where(pred > 0.6, pred, torch.zeros_like(pred).to(self.device))
             logit_sum = torch.sum(trunc_pred, -1)
             nonzero_ind = torch.nonzero(logit_sum)
             trunc_bs = len(nonzero_ind)
@@ -245,7 +244,7 @@ class Trainer():
         acc = self.calc_acc(max_ind, _y.view(-1))
 
         # validation step
-        if step % self.args.training.val_freq == 0:
+        if step % self.args.val_freq == 0:
             print('[start validation]')
             val_loss_sum = 0
             val_acc_sum = 0
