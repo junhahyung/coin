@@ -42,13 +42,15 @@ class CoinDataset(Dataset):
         x_orig = self.data.iloc[index:index+self.conf.nhist, :]
         y_orig = self.data.iloc[index+self.conf.nhist+self.conf.ntarget-1, :]
         isLong = x_orig.iloc[-1]['Close'] < y_orig['Close']
+        change = np.array(abs((x_orig.iloc[-1]['Close'] - y_orig['Close']) / x_orig.iloc[-1]['Close']))
 
-#         print(x_norm.shape, y_norm.shape, isLong, x_orig.shape, y_orig.shape)
-#         print(x_norm.shape, y_norm.type, isLong, x_orig.shape, y_orig.shape)
+        # print(x_norm.shape, y_norm.shape, isLong.shape, change.shape, x_orig.shape, y_orig.shape)
+        # print(x_norm.shape, y_norm.type, isLong, x_orig.shape, y_orig.shape)
         return \
             torch.FloatTensor(x_norm.values), \
             torch.FloatTensor(list(y_norm.values)), \
-            torch.LongTensor(isLong), \
+            torch.tensor(isLong).long(), \
+            torch.FloatTensor(change), \
             torch.FloatTensor(x_orig.values), \
             torch.FloatTensor(list(y_orig.values))
 
