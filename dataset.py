@@ -8,7 +8,7 @@ from torch.utils.data import Dataset
 from torch.utils.data.sampler import RandomSampler
 
 
-DATASET_PATH = './data/dataset'
+DATASET_PATH = '/Volumes/GoogleDrive/내 드라이브/stock-ai/dataset'
 
 
 class CoinDataset(Dataset):
@@ -17,8 +17,11 @@ class CoinDataset(Dataset):
         self.train = train
         
         # DATA READ
-        DATA_PATH = DATASET_PATH + "/{}USDT_{}.csv".format(conf.pair, conf.intv)
-        self.data = pd.read_csv(DATA_PATH)
+        data_list = []
+        for pair in conf.pair:
+            DATA_PATH = DATASET_PATH + "/{}USDT_{}.csv".format(pair, conf.intv)
+            data_list.append(pd.read_csv(DATA_PATH).iloc[:, 4:])
+        self.data = pd.concat(data_list, axis = 1)
         
         # Data Type
         if self.train:
@@ -27,30 +30,27 @@ class CoinDataset(Dataset):
             self.data = self.data[int(len(self.data)*conf.ratio):]
             
         # Normalization
-        ohlcv = self.data.iloc[:,4:]
-        ohlcv_norm = (2*(ohlcv-ohlcv.min())/(ohlcv.max()-ohlcv.min())-1)
-        self.data_norm = pd.concat([self.data.iloc[:,:4], ohlcv_norm], axis = 1)
+        ohlcv = self.data
+        self.data_norm = (2*(ohlcv-ohlcv.min())/(ohlcv.max()-ohlcv.min())-1)
 
     def __len__(self):
         return len(self.data_norm)-self.conf.nhist-self.conf.ntarget+1
 
     def __getitem__(self, index):
-        x_norm = self.data_norm.iloc[index:index+self.conf.nhist, 4:]   
-        y_norm = self.data_norm.iloc[index+self.conf.nhist+self.conf.ntarget-1, 4:]
-        x_orig = self.data.iloc[index:index+self.conf.nhist, 4:]
-        y_orig = self.data.iloc[index+self.conf.nhist+self.conf.ntarget-1, 4:]
+        x_norm = self.data_norm.iloc[index:index+self.conf.nhist, :]   
+        y_norm = self.data_norm.iloc[index+self.conf.nhist+self.conf.ntarget-1, :]
+        x_orig = self.data.iloc[index:index+self.conf.nhist, :]
+        y_orig = self.data.iloc[index+self.conf.nhist+self.conf.ntarget-1, :]
         isLong = x_orig.iloc[-1]['Close'] < y_orig['Close']
-        if isLong:
-            isLong = torch.ones(1).long()
-        else:
-            isLong = torch.zeros(1).long()
+        change = np.array(abs((x_orig.iloc[-1]['Close'] - y_orig['Close']) / x_orig.iloc[-1]['Close']))
 
-#         print(x_norm.shape, y_norm.shape, isLong, x_orig.shape, y_orig.shape)
-#         print(x_norm.shape, y_norm.type, isLong, x_orig.shape, y_orig.shape)
+        # print(x_norm.shape, y_norm.shape, isLong.shape, change.shape, x_orig.shape, y_orig.shape)
+        # print(x_norm.shape, y_norm.type, isLong, x_orig.shape, y_orig.shape)
         return \
             torch.FloatTensor(x_norm.values), \
             torch.FloatTensor(list(y_norm.values)), \
-            isLong, \
+            torch.tensor(isLong).long(), \
+            torch.FloatTensor(change), \
             torch.FloatTensor(x_orig.values), \
             torch.FloatTensor(list(y_orig.values))
 

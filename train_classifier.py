@@ -3,7 +3,6 @@ import argparse
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-import yaml
 from attrdict import AttrDict
 from trainer_classifier import Trainer
 from dataset import get_dataset, CoinDataset
@@ -55,7 +54,7 @@ def run(conf):
 
 def add_global_args():
     args = argparse.ArgumentParser()
-    args.add_argument("--pair", default="BTC", type=str)
+    args.add_argument("--pair", nargs="+", type=str, required=True, choices=['BTC', 'ETH'])
     args.add_argument("--intv", default="1h", type=str)
     args.add_argument("--nhist", default=100, type=int)
     args.add_argument("--ntarget", default=4, type=int)
