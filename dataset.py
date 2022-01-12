@@ -41,18 +41,14 @@ class CoinDataset(Dataset):
         y_norm = self.data_norm.iloc[index+self.conf.nhist+self.conf.ntarget-1, :]
         x_orig = self.data.iloc[index:index+self.conf.nhist, :]
         y_orig = self.data.iloc[index+self.conf.nhist+self.conf.ntarget-1, :]
-        isLong = x_orig.iloc[-1]['Close'][0] < y_orig['Close'][0]
-        if isLong:
-            isLong = torch.ones(1).long()
-        else:
-            isLong = torch.zeros(1).long()
+        isLong = x_orig.iloc[-1]['Close'] < y_orig['Close']
 
 #         print(x_norm.shape, y_norm.shape, isLong, x_orig.shape, y_orig.shape)
 #         print(x_norm.shape, y_norm.type, isLong, x_orig.shape, y_orig.shape)
         return \
             torch.FloatTensor(x_norm.values), \
             torch.FloatTensor(list(y_norm.values)), \
-            isLong, \
+            torch.LongTensor(isLong), \
             torch.FloatTensor(x_orig.values), \
             torch.FloatTensor(list(y_orig.values))
 
